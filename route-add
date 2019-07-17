@@ -41,6 +41,11 @@ getDomainIp()
 	echo $(getent hosts ${DOMAIN} | awk '{print $1}')
 }
 
+setDomainRoutes()
+{
+	getent hosts $1 | awk '{print $1}' | xargs -i{} sudo ip route replace {} via $2 dev $3
+}
+
 if [ -z "$DOMAIN" ]; then
 	echo -e "\tDomain is not given!"
 	bye
@@ -65,6 +70,7 @@ if [ -z "$GW_IP" ]; then
 	fi
 fi
 echo "Gateway IP: ${GW_IP}"
-sudo ip route replace ${DOMAIN_IP} via ${GW_IP} dev ${GW_DEV}
+setDomainRoutes ${DOMAIN} ${GW_IP} ${GW_DEV}
+
 echo "Routes Added."
 
