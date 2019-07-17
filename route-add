@@ -1,0 +1,15 @@
+#!/bin/bash
+
+DOMAIN=$1
+GW_DEV=$2
+GW_IP=$3
+
+#getent hosts ${DOMAIN}
+#getent hosts ${DOMAIN} | awk '{ ip route $1 }'
+
+#dig +short ${DOMAIN} | xargs -i{} sudo ip route replace {} via ${GW_IP} dev ${GW_DEV}
+
+getent hosts ${DOMAIN} | awk '{print $1}'
+getent hosts ${DOMAIN} | awk '{print $1}' | xargs -i{} sudo ip route replace {} via ${GW_IP} dev ${GW_DEV}
+echo "Routes Added."
+
