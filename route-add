@@ -1,15 +1,70 @@
 #!/bin/bash
+trap "exit 1" TERM
+export TOP_PID=$$
 
 DOMAIN=$1
 GW_DEV=$2
 GW_IP=$3
 
-#getent hosts ${DOMAIN}
-#getent hosts ${DOMAIN} | awk '{ ip route $1 }'
+bye()
+{
+	kill -s TERM $TOP_PID
+}
 
-#dig +short ${DOMAIN} | xargs -i{} sudo ip route replace {} via ${GW_IP} dev ${GW_DEV}
+askDevice ()
+{
+	while true; do
+		echo "Select Device:"
+		mapfile -t dev_list < <(ifconfig -s | cut -f1 -d ' ' | grep -v Iface)
+		for i in "${!dev_list[@]}"; do
+			printf "[%d]\t%s\n" "$i" "${dev_list[$i]}"
+		done
+		echo "---------------------------------------------"
+		echo -n "Device number: "
+		read dev_index
+		if [ -z "${dev_list[${dev_index}]}" ]; then
+			echo -e "\n\tInvalid device"
+		else
+			GW_DEV=${dev_list[$dev_index]}
+			break
+		fi
+	done
+}
 
-getent hosts ${DOMAIN} | awk '{print $1}'
-getent hosts ${DOMAIN} | awk '{print $1}' | xargs -i{} sudo ip route replace {} via ${GW_IP} dev ${GW_DEV}
+getGatewayIp()
+{
+	echo $(ip route sh | grep "$1" | grep "default" | cut -d ' ' -f3)
+}
+
+getDomainIp()
+{
+	echo $(getent hosts ${DOMAIN} | awk '{print $1}')
+}
+
+if [ -z "$DOMAIN" ]; then
+	echo -e "\tDomain is not given!"
+	bye
+fi
+
+DOMAIN_IP=$(getDomainIp)
+echo -e "Domain: ${DOMAIN}\t (${DOMAIN_IP})"
+
+if [ -z "$GW_DEV" ]; then
+	askDevice
+fi
+echo -e "Device: ${GW_DEV}"
+
+if [ -z "$GW_IP" ]; then
+	ip=$(getGatewayIp $GW_DEV)
+        if [ "$ip" == "$GW_DEV" ]; then
+		echo -e "\tThis is your default out going traffic route!"
+		echo -e "\tYour route to ${DOMAIN} is already passed via this gateway"
+		bye
+	else
+		GW_IP=${ip}
+	fi
+fi
+echo "Gateway IP: ${GW_IP}"
+sudo ip route replace ${DOMAIN_IP} via ${GW_IP} dev ${GW_DEV}
 echo "Routes Added."
 
