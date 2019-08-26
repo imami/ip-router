@@ -36,6 +36,16 @@ getGatewayIp()
 	echo $(ip route sh | grep "$1" | grep "default" | cut -d ' ' -f3)
 }
 
+getGatewayMetric()
+{
+	METRIC=""
+	F8=$(ip route sh | grep "$1" | grep "default" | cut -d ' ' -f8)
+	if [ "$F8" == "metric" ]; then
+		METRIC=$(ip route sh | grep "$1" | grep "default" | cut -d ' ' -f9)
+	fi
+	echo "$METRIC"
+}
+
 getDomainIp()
 {
 	echo $(getent hosts ${DOMAIN} | awk '{print $1}')
@@ -43,7 +53,11 @@ getDomainIp()
 
 setDomainRoutes()
 {
-	getent hosts $1 | awk '{print $1}' | xargs -i{} sudo ip route replace {} via $2 dev $3
+	if [ -z "$4" ]; then
+		getent hosts $1 | awk '{print $1}' | xargs -i{} sudo ip route replace {} via $2 dev $3
+	else
+		getent hosts $1 | awk '{print $1}' | xargs -i{} sudo ip route replace {} via $2 dev $3 metric $4
+	fi
 }
 
 if [ -z "$DOMAIN" ]; then
@@ -61,7 +75,7 @@ echo -e "Device: ${GW_DEV}"
 
 if [ -z "$GW_IP" ]; then
 	ip=$(getGatewayIp $GW_DEV)
-        if [ "$ip" == "$GW_DEV" ]; then
+    if [ "$ip" == "$GW_DEV" ]; then
 		echo -e "\tThis is your default out going traffic route!"
 		echo -e "\tYour route to ${DOMAIN} is already passed via this gateway"
 		bye
@@ -69,8 +83,16 @@ if [ -z "$GW_IP" ]; then
 		GW_IP=${ip}
 	fi
 fi
+
+GW_METRIC=$(getGatewayMetric $GW_DEV)
+
 echo "Gateway IP: ${GW_IP}"
-setDomainRoutes ${DOMAIN} ${GW_IP} ${GW_DEV}
+if [ -z "$GW_IP" ]; then
+	setDomainRoutes ${DOMAIN} ${GW_IP} ${GW_DEV}
+else
+	echo "Gateway Metric: ${GW_METRIC}"
+	setDomainRoutes ${DOMAIN} ${GW_IP} ${GW_DEV} ${GW_METRIC}
+fi
 
 echo "Routes Added."
 
